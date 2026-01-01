@@ -32,13 +32,19 @@ function App() {
       // Use environment variable for API URL, fallback to relative path for Vercel
       const apiUrl = process.env.REACT_APP_API_URL || "/api/predict";
       
+      // Validate and prepare request data
       const requestData = {
-        ...formData,
-        ApplicantIncome: Number(formData.ApplicantIncome) || 0,
-        CoapplicantIncome: Number(formData.CoapplicantIncome) || 0,
-        LoanAmount: Number(formData.LoanAmount) || 0,
-        Loan_Amount_Term: Number(formData.Loan_Amount_Term) || 360,
-        Credit_History: Number(formData.Credit_History) || 1
+        Gender: formData.Gender || "Male",
+        Married: formData.Married || "Yes",
+        Dependents: formData.Dependents || "0",
+        Education: formData.Education || "Graduate",
+        Self_Employed: formData.Self_Employed || "No",
+        ApplicantIncome: formData.ApplicantIncome ? Number(formData.ApplicantIncome) : 0,
+        CoapplicantIncome: formData.CoapplicantIncome ? Number(formData.CoapplicantIncome) : 0,
+        LoanAmount: formData.LoanAmount ? Number(formData.LoanAmount) : 0,
+        Loan_Amount_Term: formData.Loan_Amount_Term ? Number(formData.Loan_Amount_Term) : 360,
+        Credit_History: formData.Credit_History ? Number(formData.Credit_History) : 1,
+        Property_Area: formData.Property_Area || "Urban"
       };
 
       console.log("Sending request to:", apiUrl);
