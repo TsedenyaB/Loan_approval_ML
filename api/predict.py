@@ -5,8 +5,10 @@ import joblib
 import os
 import warnings
 
-# Suppress warnings
-warnings.filterwarnings('ignore')
+# Suppress warnings but allow model loading
+import sys
+warnings.filterwarnings('ignore', category=UserWarning)
+# Don't suppress the version warning - we need to see it
 
 # Load models (cached on cold start)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,19 +18,42 @@ dt_model = None
 def load_models():
     global lr_model, dt_model
     try:
+        # Check sklearn version - MUST be 1.6.1 for model compatibility
+        import sklearn
+        sklearn_version = sklearn.__version__
+        print(f"Loaded scikit-learn version: {sklearn_version}")
+        
+        # Models were trained with 1.6.1 - enforce this version
+        if sklearn_version != "1.6.1":
+            raise Exception(
+                f"Version mismatch! Models require scikit-learn 1.6.1, "
+                f"but {sklearn_version} is installed. Please update requirements.txt"
+            )
+        
         if lr_model is None:
             model_path = os.path.join(BASE_DIR, "ml_models", "logistic_regression_model.pkl")
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model file not found: {model_path}")
-            lr_model = joblib.load(model_path)
+            # Load with warnings suppressed
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                lr_model = joblib.load(model_path)
+            print("Logistic Regression model loaded successfully")
         
         if dt_model is None:
             model_path = os.path.join(BASE_DIR, "ml_models", "decision_tree_model.pkl")
             if not os.path.exists(model_path):
                 raise FileNotFoundError(f"Model file not found: {model_path}")
-            dt_model = joblib.load(model_path)
+            # Load with warnings suppressed
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                dt_model = joblib.load(model_path)
+            print("Decision Tree model loaded successfully")
     except Exception as e:
-        raise Exception(f"Error loading models: {str(e)}")
+        import traceback
+        error_msg = f"Error loading models: {str(e)}\n{traceback.format_exc()}"
+        print(error_msg)
+        raise Exception(error_msg)
 
 class handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
@@ -120,15 +145,21 @@ class handler(BaseHTTPRequestHandler):
         except Exception as e:
             import traceback
             error_trace = traceback.format_exc()
-            # Error response with detailed error info
+            # Error response - keep it simple for Vercel
+            error_msg = str(e)
+            error_type = type(e).__name__
+            
+            # Log the full error (Vercel will capture this)
+            print(f"ERROR: {error_type}: {error_msg}")
+            print(f"TRACEBACK: {error_trace}")
+            
             self.send_response(500)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
+            # Send simplified error response
             error_response = {
-                "error": str(e),
-                "type": type(e).__name__
+                "error": error_msg,
+                "type": error_type
             }
-            # Only include traceback in development (you can remove this line for production)
-            error_response["traceback"] = error_trace
             self.wfile.write(json.dumps(error_response).encode('utf-8'))
