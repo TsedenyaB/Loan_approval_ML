@@ -32,28 +32,62 @@ function App() {
       // Use environment variable for API URL, fallback to relative path for Vercel
       const apiUrl = process.env.REACT_APP_API_URL || "/api/predict";
       
+      const requestData = {
+        ...formData,
+        ApplicantIncome: Number(formData.ApplicantIncome) || 0,
+        CoapplicantIncome: Number(formData.CoapplicantIncome) || 0,
+        LoanAmount: Number(formData.LoanAmount) || 0,
+        Loan_Amount_Term: Number(formData.Loan_Amount_Term) || 360,
+        Credit_History: Number(formData.Credit_History) || 1
+      };
+
+      console.log("Sending request to:", apiUrl);
+      console.log("Request data:", requestData);
+
+      // Add timeout to fetch request
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(apiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...formData,
-          ApplicantIncome: Number(formData.ApplicantIncome),
-          CoapplicantIncome: Number(formData.CoapplicantIncome),
-          LoanAmount: Number(formData.LoanAmount),
-          Loan_Amount_Term: Number(formData.Loan_Amount_Term),
-          Credit_History: Number(formData.Credit_History)
-        })
+        body: JSON.stringify(requestData),
+        signal: controller.signal
       });
 
+      clearTimeout(timeoutId);
+
+      console.log("Response status:", response.status);
+      console.log("Response ok:", response.ok);
+
+      const responseText = await response.text();
+      console.log("Response text:", responseText);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        let errorData;
+        try {
+          errorData = JSON.parse(responseText);
+        } catch {
+          errorData = { error: responseText || `HTTP error! status: ${response.status}` };
+        }
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${responseText}`);
+      }
+
+      console.log("Parsed data:", data);
 
       if (data.error) {
         throw new Error(data.error);
+      }
+
+      if (!data.logistic_regression || !data.decision_tree) {
+        throw new Error("Invalid response format from API");
       }
 
       setPrediction(
@@ -63,7 +97,11 @@ function App() {
       );
     } catch (error) {
       console.error("Prediction error:", error);
-      setPrediction(`Error: ${error.message}`);
+      if (error.name === 'AbortError') {
+        setPrediction("Error: Request timed out. Please try again.");
+      } else {
+        setPrediction(`Error: ${error.message}`);
+      }
     } finally {
       setLoading(false);
     }
