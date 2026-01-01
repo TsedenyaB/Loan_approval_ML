@@ -55,11 +55,17 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(response).encode('utf-8'))
             
         except Exception as e:
-            # Error response
+            import traceback
+            error_trace = traceback.format_exc()
+            # Error response with detailed error info
             self.send_response(500)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            error_response = {"error": str(e)}
+            error_response = {
+                "error": str(e),
+                "type": type(e).__name__,
+                "traceback": error_trace
+            }
             self.wfile.write(json.dumps(error_response).encode('utf-8'))
 
