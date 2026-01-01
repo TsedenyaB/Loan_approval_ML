@@ -1,6 +1,6 @@
 from http.server import BaseHTTPRequestHandler
 import json
-import numpy as np
+import pandas as pd
 import joblib
 import os
 
@@ -8,61 +8,13 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 lr_model = None
 dt_model = None
-feature_names = None
 
 def load_models():
-    global lr_model, dt_model, feature_names
+    global lr_model, dt_model
     if lr_model is None:
         lr_model = joblib.load(os.path.join(BASE_DIR, "ml_models/logistic_regression_model.pkl"))
     if dt_model is None:
         dt_model = joblib.load(os.path.join(BASE_DIR, "ml_models/decision_tree_model.pkl"))
-    
-    # Try to get feature names from model (sklearn 1.0+)
-    if feature_names is None:
-        if hasattr(lr_model, 'feature_names_in_'):
-            feature_names = list(lr_model.feature_names_in_)
-        elif hasattr(dt_model, 'feature_names_in_'):
-            feature_names = list(dt_model.feature_names_in_)
-        else:
-            # Default feature order (typical loan dataset)
-            feature_names = [
-                'Gender', 'Married', 'Dependents', 'Education', 
-                'Self_Employed', 'ApplicantIncome', 'CoapplicantIncome', 
-                'LoanAmount', 'Loan_Amount_Term', 'Credit_History', 'Property_Area'
-            ]
-
-def convert_to_array(data):
-    """
-    Convert dictionary to numpy array in the order expected by the model.
-    """
-    global feature_names
-    values = []
-    for feature in feature_names:
-        value = data.get(feature, 0)
-        
-        # Convert categorical to numeric if needed
-        if feature == 'Gender':
-            value = 1 if str(value).lower() in ['male', '1', 'yes'] else 0
-        elif feature == 'Married':
-            value = 1 if str(value).lower() in ['yes', '1', 'married'] else 0
-        elif feature == 'Education':
-            value = 1 if str(value).lower() in ['graduate', '1', 'yes'] else 0
-        elif feature == 'Self_Employed':
-            value = 1 if str(value).lower() in ['yes', '1'] else 0
-        elif feature == 'Property_Area':
-            # Urban=2, Semiurban=1, Rural=0 (typical encoding)
-            prop = str(value).lower()
-            value = 2 if 'urban' in prop else (1 if 'semi' in prop else 0)
-        else:
-            # Convert to float for numeric features
-            try:
-                value = float(value)
-            except (ValueError, TypeError):
-                value = 0.0
-        
-        values.append(value)
-    
-    return np.array([values], dtype=np.float64)
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -82,12 +34,12 @@ class handler(BaseHTTPRequestHandler):
             body = self.rfile.read(content_length)
             data = json.loads(body.decode('utf-8'))
             
-            # Convert to numpy array
-            features = convert_to_array(data)
+            # Convert to DataFrame (exactly as the original code did)
+            df = pd.DataFrame([data])
             
             # Make predictions
-            lr_pred = lr_model.predict(features)[0]
-            dt_pred = dt_model.predict(features)[0]
+            lr_pred = lr_model.predict(df)[0]
+            dt_pred = dt_model.predict(df)[0]
             
             # Prepare response
             response = {

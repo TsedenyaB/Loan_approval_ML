@@ -28,31 +28,45 @@ function App() {
     setLoading(true);
     setPrediction(null);
 
-    // Use environment variable for API URL, fallback to relative path for Vercel
-    const apiUrl = process.env.REACT_APP_API_URL || "/api/predict";
-    
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...formData,
-        ApplicantIncome: Number(formData.ApplicantIncome),
-        CoapplicantIncome: Number(formData.CoapplicantIncome),
-        LoanAmount: Number(formData.LoanAmount),
-        Loan_Amount_Term: Number(formData.Loan_Amount_Term),
-        Credit_History: Number(formData.Credit_History)
-      })
-    });
+    try {
+      // Use environment variable for API URL, fallback to relative path for Vercel
+      const apiUrl = process.env.REACT_APP_API_URL || "/api/predict";
+      
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...formData,
+          ApplicantIncome: Number(formData.ApplicantIncome),
+          CoapplicantIncome: Number(formData.CoapplicantIncome),
+          LoanAmount: Number(formData.LoanAmount),
+          Loan_Amount_Term: Number(formData.Loan_Amount_Term),
+          Credit_History: Number(formData.Credit_History)
+        })
+      });
 
-    const data = await response.json();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
 
-    setPrediction(
-      modelType === "logistic"
-        ? data.logistic_regression
-        : data.decision_tree
-    );
+      const data = await response.json();
 
-    setLoading(false);
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      setPrediction(
+        modelType === "logistic"
+          ? data.logistic_regression
+          : data.decision_tree
+      );
+    } catch (error) {
+      console.error("Prediction error:", error);
+      setPrediction(`Error: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
